@@ -1,9 +1,7 @@
-// api/append.js — Vercel serverless function
-// Receives rows from the Admin panel and appends them to Google Sheets.
-// The service account credentials live here, server-side, never exposed to browsers.
+// api/append.js — Vercel serverless function (Node.js runtime)
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
-  // Only accept POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -18,16 +16,14 @@ export default async function handler(req, res) {
   const PRIVATE_KEY  = (process.env.SHEETS_PRIVATE_KEY || '').replace(/\\n/g, '\n');
 
   if (!SHEET_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
-    return res.status(500).json({ error: 'Google Sheets credentials not configured' });
+    return res.status(500).json({ error: `Missing credentials: ${!SHEET_ID?'SHEET_ID ':''} ${!CLIENT_EMAIL?'CLIENT_EMAIL ':''} ${!PRIVATE_KEY?'PRIVATE_KEY':''}` });
   }
 
   try {
-    // 1. Get an access token using the service account JWT
     const token = await getAccessToken(CLIENT_EMAIL, PRIVATE_KEY);
 
-    // 2. Append the rows to the Sheet
-    const range  = 'Artículos!A:J';
-    const apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+    const range   = 'Artículos!A:J';
+    const apiUrl  = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
 
     const sheetsResp = await fetch(apiUrl, {
       method: 'POST',
@@ -51,11 +47,8 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Minimal JWT / OAuth2 implementation for Google service accounts ───────────
-// (no external dependencies needed — uses Web Crypto API available in Vercel edge)
-
 async function getAccessToken(clientEmail, privateKeyPem) {
-  const now  = Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now() / 1000);
   const claim = {
     iss:   clientEmail,
     scope: 'https://www.googleapis.com/auth/spreadsheets',
@@ -68,14 +61,13 @@ async function getAccessToken(clientEmail, privateKeyPem) {
   const payload = b64url(JSON.stringify(claim));
   const unsigned = `${header}.${payload}`;
 
-  const key = await importRSAKey(privateKeyPem);
-  const sig = await crypto.subtle.sign(
-    { name: 'RSASSA-PKCS1-v1_5' },
-    key,
-    new TextEncoder().encode(unsigned)
-  );
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(unsigned);
+  sign.end();
+  const sig = sign.sign(privateKeyPem, 'base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
-  const jwt = `${unsigned}.${b64urlBuf(sig)}`;
+  const jwt = `${unsigned}.${sig}`;
 
   const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -96,24 +88,6 @@ async function getAccessToken(clientEmail, privateKeyPem) {
 }
 
 function b64url(str) {
-  return btoa(unescape(encodeURIComponent(str)))
+  return Buffer.from(str).toString('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-function b64urlBuf(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-async function importRSAKey(pem) {
-  const pemBody = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s+/g, '');
-  const der = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
-  return crypto.subtle.importKey(
-    'pkcs8', der.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  );
 }
