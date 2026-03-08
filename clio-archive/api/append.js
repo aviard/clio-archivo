@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No rows provided' });
   }
 
-  const SHEET_ID     = process.env.SHEETS_ID;
+  const SHEET_ID     = process.env.VITE_SHEETS_ID;
   const CLIENT_EMAIL = process.env.SHEETS_CLIENT_EMAIL;
   const PRIVATE_KEY  = (process.env.SHEETS_PRIVATE_KEY || '').replace(/\\n/g, '\n');
 
