@@ -1,7 +1,7 @@
 import { DOMAINS, PERIODS, SEED_TAGS } from './taxonomy.js';
 
 async function fetchPdfBase64(pdfUrl) {
-  const proxy = `https://corsproxy.io/?${encodeURIComponent(pdfUrl)}`;
+  const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(pdfUrl)}`;
   const resp = await fetch(proxy);
   if (!resp.ok) throw new Error(`No se pudo obtener el PDF (HTTP ${resp.status})`);
   const blob = await resp.blob();
