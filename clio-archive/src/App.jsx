@@ -86,7 +86,7 @@ export default function App() {
   // Admin: run cataloging
   const runCatalog = async (batchSize) => {
     setRunning(true); stopRef.current = false;
-    const remaining = ISSUES.filter(i => !cataloged.has(`${i.year}-${i.no}`));
+    const remaining = [...ISSUES].filter(i => !cataloged.has(`${i.year}-${i.no}`));
     const batch = remaining.slice(0, batchSize);
     setProg({n:0, total:batch.length});
     for (let i=0; i<batch.length; i++) {
