@@ -136,7 +136,7 @@ export default function App() {
         pdf_url: hit.pdf_url || '',
         resumen: hit._snippetResult?.resumen?.value || hit.resumen || '',
         _isAlgolia: true,
-      }))\
+      }))
     : filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
 
   const totalPages = usingAlgolia ? algoliaPages : Math.ceil(filtered.length / PER_PAGE);
