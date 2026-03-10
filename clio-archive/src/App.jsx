@@ -111,8 +111,8 @@ export default function App() {
     if (fTag && !a.tags.includes(fTag) && !a.new_tags.includes(fTag)) return false;
     return true;
   }).sort((a,b) => {
-    if (sortBy==='reciente') return (parseInt(b.year)||0)-(parseInt(a.year)||0);
-    if (sortBy==='antiguo')  return (parseInt(a.year)||0)-(parseInt(b.year)||0);
+    if (sortBy==='reciente') return (parseInt(b.year)||0)-(parseInt(a.year)||0) || (parseInt(b.no)||0)-(parseInt(a.no)||0);
+    if (sortBy==='antiguo')  return (parseInt(a.year)||0)-(parseInt(b.year)||0) || (parseInt(a.no)||0)-(parseInt(b.no)||0);
     if (sortBy==='titulo')   return (a.title||'').localeCompare(b.title||'','es');
     if (sortBy==='autor')    return (a.author||'').localeCompare(b.author||'','es');
     return 0;
@@ -217,7 +217,7 @@ export default function App() {
                 <em>Clío</em>
               </h1>
               <div style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                Índice Analítico · Números 1–210 · 1933–2025
+                Índice Analítico · Números 1–209 · 1933–2025
               </div>
             </div>
             <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
