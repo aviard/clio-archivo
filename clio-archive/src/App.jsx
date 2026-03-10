@@ -122,19 +122,21 @@ export default function App() {
   const usingAlgolia = algoliaResults !== null && q.trim().length >= 2;
   const displayArts  = usingAlgolia
     ? algoliaResults.map(hit => ({
-        year:    hit.year    || '',
+        year:    String(hit.año || hit.year || ''),
         no:      hit.numero  || '',
         title:   hit._highlightResult?.titulo?.value || hit.titulo || '',
         author:  hit._highlightResult?.autor?.value  || hit.autor  || '',
         pages:   hit.paginas || '',
         domain:  hit.dominio || '',
         period:  hit.periodo || '',
-        tags:    hit.etiquetas || [],
+        tags:    Array.isArray(hit.etiquetas) ? hit.etiquetas
+                   : typeof hit.etiquetas === 'string' ? hit.etiquetas.split(',').map(t=>t.trim()).filter(Boolean)
+                   : [],
         new_tags:[],
         pdf_url: hit.pdf_url || '',
-        resumen: hit._snippetResult?.resumen?.value || hit._snippetResult?.texto?.value || hit.resumen || '',
+        resumen: hit._snippetResult?.resumen?.value || hit.resumen || '',
         _isAlgolia: true,
-      }))
+      }))\
     : filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
 
   const totalPages = usingAlgolia ? algoliaPages : Math.ceil(filtered.length / PER_PAGE);
@@ -393,16 +395,22 @@ export default function App() {
                             <div style={{fontFamily:BODY,fontSize:15,color:INK,marginBottom:4}}>
                               {a.pdf_url
                                 ? <a href={a.pdf_url} target="_blank" rel="noreferrer"
-                                    style={{color:INK,textDecoration:'none',borderBottom:`1px solid ${RULE}`}}>
-                                    {hl(a.title,q)}
+                                    style={{color:INK,textDecoration:'none',borderBottom:`1px solid ${RULE}`}}
+                                    dangerouslySetInnerHTML={a._isAlgolia ? {__html: a.title} : undefined}>
+                                    {a._isAlgolia ? undefined : hl(a.title,q)}
                                   </a>
-                                : hl(a.title,q)
+                                : a._isAlgolia
+                                  ? <span dangerouslySetInnerHTML={{__html: a.title}}/>
+                                  : hl(a.title,q)
                               }
                             </div>
                             {a.resumen && (
                               <div style={{fontFamily:BODY,fontSize:12,color:'#666',
                                            lineHeight:1.5,marginBottom:5,fontStyle:'italic'}}>
-                                {hl(a.resumen,q)}
+                                {a._isAlgolia
+                                  ? <span dangerouslySetInnerHTML={{__html: a.resumen}}/>
+                                  : hl(a.resumen,q)
+                                }
                               </div>
                             )}
                             <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
@@ -427,12 +435,13 @@ export default function App() {
                           </td>
                           <td style={{padding:'10px 10px',fontStyle:'italic',color:'#444',
                                       fontSize:13,verticalAlign:'top'}}>
-                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setQ(a.author);}}
+                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setQ(a._isAlgolia ? a.author.replace(/<[^>]*>/g,'') : a.author);}}
                               style={{fontFamily:'inherit',fontStyle:'italic',fontSize:13,
                                       color:'#444',background:'none',border:'none',
                                       cursor:'pointer',padding:0,textAlign:'left',
-                                      textDecoration:'underline dotted',textUnderlineOffset:3}}>
-                              {hl(a.author,q)}
+                                      textDecoration:'underline dotted',textUnderlineOffset:3}}
+                              dangerouslySetInnerHTML={a._isAlgolia ? {__html: a.author} : undefined}>
+                              {a._isAlgolia ? undefined : hl(a.author,q)}
                             </button>
                           </td>
                           <td style={{padding:'10px 10px',fontFamily:MONO,fontSize:11,
