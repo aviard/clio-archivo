@@ -217,7 +217,7 @@ export default function App() {
                 <em>Clío</em>
               </h1>
               <div style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                Índice Analítico · Números 1–209 · 1933–2025
+                Índice Analítico · Números 1–210 · 1933–2025
               </div>
             </div>
             <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
