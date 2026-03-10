@@ -1,6 +1,5 @@
 // Google Sheets integration
-// Sheet tab: "Articles"
-// Columns: A=year B=issue_no C=title D=author E=pages F=domain G=period H=tags I=new_tags J=pdf_url
+// Columns: A=año B=número C=título D=autor E=páginas F=tema G=dominio H=período I=etiquetas J=etiquetas_nuevas K=pdf_url L=indice M=resumen
 
 const SHEET_ID = import.meta.env.VITE_SHEETS_ID;
 const API_KEY  = import.meta.env.VITE_SHEETS_API_KEY;
@@ -13,16 +12,16 @@ export async function loadAllArticles() {
   if (!resp.ok) throw new Error(`Error al leer Google Sheets (${resp.status})`);
   const data = await resp.json();
   return (data.values || []).map(r => ({
-    year:     r[0] || '',
-    no:       r[1] || '',
-    title:    r[2] || '',
-    author:   r[3] || '',
-    pages:    r[4] || '',
-    domain:   r[5] || '',
-    period:   r[6] || '',
-    tags:     r[7] ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],
-    new_tags: r[8] ? r[8].split(',').map(t => t.trim()).filter(Boolean) : [],
-    pdf_url:  r[9] || '',
+    year:     r[0]  || '',
+    no:       r[1]  || '',
+    title:    r[2]  || '',
+    author:   r[3]  || '',
+    pages:    r[4]  || '',
+    domain:   r[5]  || '',   // F = Tema = dominio value
+    period:   r[6]  || '',   // G = Dominio = periodo value
+    tags:     r[7]  ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],  // H = Periodo = etiquetas
+    new_tags: [],
+    pdf_url:  r[9]  || '',   // J = Etiquetas Nuevas = pdf_url
     indice:   r[10] || '',
     resumen:  r[11] || '',
   }));
@@ -30,14 +29,12 @@ export async function loadAllArticles() {
 
 export async function loadCatalogedKeys() {
   const arts = await loadAllArticles();
-  // Build lookup with multiple key formats to handle mismatches between issues.js and sheet
-  // e.g. issues.js year="1992-1993", no="149-150" but sheet stores year="1992"
   const keys = new Set();
   arts.forEach(a => {
-    const y4 = a.year.slice(0, 4);     // normalize "1992-1993" → "1992"
-    keys.add(`${a.year}-${a.no}`);     // as stored in sheet: "1992-149-150"
-    keys.add(`${y4}-${a.no}`);         // normalized: "1992-149-150"
-    keys.add(a.no);                     // bare number: "149-150"
+    const y4 = a.year.slice(0, 4);
+    keys.add(`${a.year}-${a.no}`);
+    keys.add(`${y4}-${a.no}`);
+    keys.add(a.no);
   });
   const size = new Set(arts.map(a => `${a.year}-${a.no}`)).size;
   return { has: k => keys.has(k), size };
@@ -50,6 +47,7 @@ export async function appendIssueArticles(issue, articles) {
     a.title    || '',
     a.author   || '',
     a.pages    || '',
+    '',                          // tema — left blank
     a.domain   || '',
     a.period   || '',
     (a.tags    || []).join(', '),
