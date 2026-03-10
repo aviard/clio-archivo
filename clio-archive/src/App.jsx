@@ -129,9 +129,12 @@ export default function App() {
         pages:   hit.paginas || '',
         domain:  hit.dominio || '',
         period:  hit.periodo || '',
-        tags:    Array.isArray(hit.etiquetas) ? hit.etiquetas
-                   : typeof hit.etiquetas === 'string' ? hit.etiquetas.split(',').map(t=>t.trim()).filter(Boolean)
-                   : [],
+        tags:    (() => {
+                   const t = hit.etiquetas;
+                   if (Array.isArray(t)) return t;
+                   if (typeof t === 'string') return t.split(',').map(s=>s.trim()).filter(Boolean);
+                   return [];
+                 })(),
         new_tags:[],
         pdf_url: hit.pdf_url || '',
         resumen: hit._snippetResult?.resumen?.value || hit.resumen || '',
@@ -414,7 +417,10 @@ export default function App() {
                               </div>
                             )}
                             <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                              {a.tags.map(tag=>(
+                              {(Array.isArray(a.tags)
+                                ? a.tags.flatMap(t => typeof t==='string' && t.includes(',') ? t.split(',').map(s=>s.trim()) : [t])
+                                : []
+                              ).filter(Boolean).map(tag=>(
                                 <button key={tag} onClick={()=>{setFTag(tag);setPage(1);}}
                                   style={{fontFamily:MONO,fontSize:10,color:'#555',
                                           background:fTag===tag?'#ede8e0':'#f5f2ee',
