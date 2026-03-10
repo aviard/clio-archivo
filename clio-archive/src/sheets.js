@@ -30,12 +30,13 @@ export async function loadAllArticles() {
 
 export async function loadCatalogedKeys() {
   const arts = await loadAllArticles();
-  const keys = new Set();
-  arts.forEach(a => {
-    keys.add(`${a.year}-${a.no}`);  // e.g. "1946-74-75"
-    keys.add(a.no);                  // e.g. "74-75" — fallback for issues.js mismatches
-  });
-  return keys;
+  // Store both "year-no" and just "no" so Por Número matches regardless of issues.js format
+  // Use a separate set per format to avoid inflating the count
+  const byYearNo = new Set(arts.map(a => `${a.year}-${a.no}`));
+  const byNo     = new Set(arts.map(a => a.no));
+  // Return combined but track unique issues only by year-no
+  byNo.forEach(n => byYearNo.add(n));
+  return { has: k => byYearNo.has(k), size: new Set(arts.map(a => `${a.year}-${a.no}`)).size };
 }
 
 export async function appendIssueArticles(issue, articles) {
@@ -47,8 +48,8 @@ export async function appendIssueArticles(issue, articles) {
     a.pages    || '',
     a.domain   || '',
     a.period   || '',
-    (a.tags    || []).join(', '),
-    (a.new_tags|| []).join(', '),
+    (a.tags    || []).join('|'),
+    (a.new_tags|| []).join('|'),
     issue.pdf,
     a.indice   || '',
     a.resumen  || '',

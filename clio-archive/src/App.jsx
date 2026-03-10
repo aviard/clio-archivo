@@ -391,7 +391,13 @@ export default function App() {
                           <td style={{padding:'10px 10px',fontFamily:MONO,fontSize:12,verticalAlign:'top'}}>{a.no}</td>
                           <td style={{padding:'10px 10px',verticalAlign:'top',lineHeight:1.4}}>
                             <div style={{fontFamily:BODY,fontSize:15,color:INK,marginBottom:4}}>
-                              {hl(a.title,q)}
+                              {a.pdf_url
+                                ? <a href={a.pdf_url} target="_blank" rel="noreferrer"
+                                    style={{color:INK,textDecoration:'none',borderBottom:`1px solid ${RULE}`}}>
+                                    {hl(a.title,q)}
+                                  </a>
+                                : hl(a.title,q)
+                              }
                             </div>
                             {a.resumen && (
                               <div style={{fontFamily:BODY,fontSize:12,color:'#666',
