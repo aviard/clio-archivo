@@ -3,6 +3,7 @@ import { ISSUES } from './issues.js';
 import { DOMAINS, PERIODS } from './taxonomy.js';
 import { loadAllArticles, loadCatalogedKeys, appendIssueArticles } from './sheets.js';
 import { catalogIssue } from './catalog.js';
+import { algoliaSearch } from './algolia.js';
 
 const INK    = '#1a1a1a';
 const RULE   = '#c8c0b0';
@@ -38,6 +39,13 @@ export default function App() {
   const [page, setPage]     = useState(1);
   const PER_PAGE = 50;
 
+  // Algolia full-text search state
+  const [algoliaResults, setAlgoliaResults] = useState(null); // null = not active
+  const [algoliaLoading, setAlgoliaLoading] = useState(false);
+  const [algoliaPages, setAlgoliaPages]     = useState(0);
+  const [algoliaPage, setAlgoliaPage]       = useState(0);
+  const algoliaTimer = useRef(null);
+
   // Admin
   const [running, setRunning]   = useState(false);
   const [statusMsg, setStatus]  = useState('');
@@ -57,6 +65,32 @@ export default function App() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => { setPage(1); }, [q, fDomain, fPeriod, fTag, sortBy]);
 
+  // Algolia: trigger search when query is 2+ chars, debounced 300ms
+  useEffect(() => {
+    if (algoliaTimer.current) clearTimeout(algoliaTimer.current);
+    if (!q || q.trim().length < 2) {
+      setAlgoliaResults(null);
+      setAlgoliaLoading(false);
+      return;
+    }
+    setAlgoliaLoading(true);
+    algoliaTimer.current = setTimeout(async () => {
+      try {
+        const res = await algoliaSearch(q, { domain: fDomain, period: fPeriod, page: algoliaPage });
+        setAlgoliaResults(res.hits || []);
+        setAlgoliaPages(res.nbPages || 0);
+      } catch(e) {
+        console.error('Algolia error:', e);
+        setAlgoliaResults(null); // fall back to local filter
+      } finally {
+        setAlgoliaLoading(false);
+      }
+    }, 300);
+  }, [q, fDomain, fPeriod, algoliaPage]);
+
+  // Reset algolia page when query changes
+  useEffect(() => { setAlgoliaPage(0); }, [q, fDomain, fPeriod]);
+
   // Collect all tags that appear in the catalog
   const allTags = [...new Set(articles.flatMap(a => a.tags))].sort((a,b) => a.localeCompare(b,'es'));
   const allNewTags = [...new Set(articles.flatMap(a => a.new_tags))].sort((a,b) => a.localeCompare(b,'es'));
@@ -66,10 +100,15 @@ export default function App() {
     const lq = q.toLowerCase();
     if (lq && !(a.title||'').toLowerCase().includes(lq) &&
               !(a.author||'').toLowerCase().includes(lq) &&
-              !a.tags.some(t => t.toLowerCase().includes(lq))) return false;
+              !(a.domain||'').toLowerCase().includes(lq) &&
+              !(a.period||'').toLowerCase().includes(lq) &&
+              !a.tags.some(t => t.toLowerCase().includes(lq)) &&
+              !a.new_tags.some(t => t.toLowerCase().includes(lq)) &&
+              !(a.resumen||''  ).toLowerCase().includes(lq) &&
+              !(a.indice ||''  ).toLowerCase().includes(lq)) return false;
     if (fDomain && a.domain !== fDomain) return false;
     if (fPeriod && a.period !== fPeriod) return false;
-    if (fTag && !a.tags.includes(fTag)) return false;
+    if (fTag && !a.tags.includes(fTag) && !a.new_tags.includes(fTag)) return false;
     return true;
   }).sort((a,b) => {
     if (sortBy==='reciente') return (parseInt(b.year)||0)-(parseInt(a.year)||0);
@@ -79,9 +118,29 @@ export default function App() {
     return 0;
   });
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const pageArts   = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
-  const decades    = [...new Set(ISSUES.map(i=>Math.floor(parseInt(i.year)/10)*10).filter(Boolean))].sort((a,b)=>a-b);
+  // When algolia results available, use those; otherwise use local filtered list
+  const usingAlgolia = algoliaResults !== null && q.trim().length >= 2;
+  const displayArts  = usingAlgolia
+    ? algoliaResults.map(hit => ({
+        year:    hit.year    || '',
+        no:      hit.numero  || '',
+        title:   hit._highlightResult?.titulo?.value || hit.titulo || '',
+        author:  hit._highlightResult?.autor?.value  || hit.autor  || '',
+        pages:   hit.paginas || '',
+        domain:  hit.dominio || '',
+        period:  hit.periodo || '',
+        tags:    hit.etiquetas || [],
+        new_tags:[],
+        pdf_url: hit.pdf_url || '',
+        resumen: hit._snippetResult?.resumen?.value || hit._snippetResult?.texto?.value || hit.resumen || '',
+        _isAlgolia: true,
+      }))
+    : filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
+
+  const totalPages = usingAlgolia ? algoliaPages : Math.ceil(filtered.length / PER_PAGE);
+  const currentPage = usingAlgolia ? algoliaPage + 1 : page;
+  const pageArts   = displayArts;
+  const decades    = [...new Set(ISSUES.map(i=>Math.floor(parseInt(i.year)/10)*10).filter(Boolean))].sort((a,b)=>b-a);
 
   // Admin: run cataloging
   const runCatalog = async (batchSize) => {
@@ -182,78 +241,104 @@ export default function App() {
         {view==='search' && (
           <div style={{display:'flex',gap:36,alignItems:'flex-start'}}>
 
-            {/* Sidebar */}
-            <aside style={{width:230,flexShrink:0,position:'sticky',top:20}}>
-
-              {/* Active filters summary */}
-              {(fDomain||fPeriod||fTag) && (
-                <div style={{background:'#fff',border:`1px solid ${RULE}`,
-                             padding:'12px 14px',marginBottom:16}}>
-                  <div style={{fontFamily:MONO,fontSize:10,letterSpacing:2,
-                               color:'#888',textTransform:'uppercase',marginBottom:8}}>
-                    Filtros activos
-                  </div>
-                  {fDomain && <ActiveFilter label={fDomain} onClear={()=>setFDomain('')}/>}
-                  {fPeriod && <ActiveFilter label={fPeriod} onClear={()=>setFPeriod('')}/>}
-                  {fTag    && <ActiveFilter label={fTag}    onClear={()=>setFTag('')}/>}
-                  <button onClick={()=>{setFDomain('');setFPeriod('');setFTag('');}}
-                    style={{fontFamily:MONO,fontSize:10,color:'#888',background:'none',
-                            border:'none',cursor:'pointer',marginTop:6,textDecoration:'underline'}}>
-                    Limpiar todos
-                  </button>
-                </div>
-              )}
-
-              <SideSection label="DOMINIO">
-                <SideBtn active={!fDomain} onClick={()=>setFDomain('')}>Todos</SideBtn>
-                {DOMAINS.map(d=>(
-                  <SideBtn key={d} active={fDomain===d} onClick={()=>setFDomain(fDomain===d?'':d)}>
-                    {d}
-                  </SideBtn>
-                ))}
+            {/* Sidebar — top tags */}
+            <aside style={{width:200,flexShrink:0,position:'sticky',top:20}}>
+              <SideSection label="ETIQUETAS FRECUENTES">
+                {allTags
+                  .map(tag=>({tag,count:articles.filter(a=>a.tags.includes(tag)).length}))
+                  .sort((a,b)=>b.count-a.count)
+                  .slice(0,30)
+                  .map(({tag,count})=>(
+                    <SideBtn key={tag} active={fTag===tag} onClick={()=>setFTag(fTag===tag?'':tag)}>
+                      <span style={{flex:1}}>{tag}</span>
+                      <span style={{fontFamily:MONO,fontSize:10,color:'#aaa',marginLeft:4}}>{count}</span>
+                    </SideBtn>
+                  ))
+                }
               </SideSection>
-
-              <SideSection label="PERÍODO">
-                <SideBtn active={!fPeriod} onClick={()=>setFPeriod('')}>Todos</SideBtn>
-                {PERIODS.map(p=>(
-                  <SideBtn key={p} active={fPeriod===p} onClick={()=>setFPeriod(fPeriod===p?'':p)}>
-                    {p}
-                  </SideBtn>
-                ))}
-              </SideSection>
-
-              {fTag && (
-                <SideSection label="ETIQUETA">
-                  <SideBtn active={true} onClick={()=>setFTag('')}>{fTag} ×</SideBtn>
-                </SideSection>
-              )}
             </aside>
 
             {/* Results */}
             <div style={{flex:1,minWidth:0}}>
               <div style={{marginBottom:20}}>
-                <input value={q} onChange={e=>setQ(e.target.value)}
-                  placeholder="Buscar por título, autor o etiqueta…"
-                  style={{width:'100%',fontFamily:BODY,fontSize:18,color:INK,
-                          background:'#fff',border:`1px solid ${RULE}`,
-                          borderBottom:`2px solid ${INK}`,padding:'11px 14px',
-                          outline:'none',boxSizing:'border-box',marginBottom:10}}/>
-                <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-                  <label style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                    Ordenar por
-                  </label>
+                {/* Search input */}
+                <div style={{position:'relative',marginBottom:8}}>
+                  <input value={q} onChange={e=>setQ(e.target.value)}
+                    placeholder="Buscar por título, autor, período, dominio o etiqueta…"
+                    style={{width:'100%',fontFamily:BODY,fontSize:17,color:INK,
+                            background:'#fff',border:`1px solid ${RULE}`,
+                            borderBottom:`2px solid ${INK}`,padding:'11px 40px 11px 14px',
+                            outline:'none',boxSizing:'border-box'}}/>
+                  {q && (
+                    <button onClick={()=>setQ('')} style={{
+                      position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',
+                      fontFamily:MONO,fontSize:18,color:'#aaa',background:'none',
+                      border:'none',cursor:'pointer',lineHeight:1,padding:0}}>×</button>
+                  )}
+                </div>
+                {/* Filter + sort bar */}
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',
+                             background:'#fff',border:`1px solid ${RULE}`,padding:'8px 12px'}}>
+                  <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
+                                color:'#aaa',textTransform:'uppercase',marginRight:4}}>Filtrar:</span>
+                  <select value={fDomain} onChange={e=>setFDomain(e.target.value)} style={{
+                    fontFamily:BODY,fontSize:13,color:fDomain?INK:'#888',background:'#fff',
+                    border:`1px solid ${fDomain?INK:RULE}`,padding:'4px 6px',outline:'none',
+                    maxWidth:190}}>
+                    <option value="">Todos los dominios</option>
+                    {DOMAINS.map(d=><option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select value={fPeriod} onChange={e=>setFPeriod(e.target.value)} style={{
+                    fontFamily:BODY,fontSize:13,color:fPeriod?INK:'#888',background:'#fff',
+                    border:`1px solid ${fPeriod?INK:RULE}`,padding:'4px 6px',outline:'none'}}>
+                    <option value="">Todos los períodos</option>
+                    {PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <div style={{width:1,height:20,background:RULE,margin:'0 4px'}}/>
+                  <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
+                                color:'#aaa',textTransform:'uppercase'}}>Ordenar:</span>
                   <select value={sortBy} onChange={e=>setSort(e.target.value)} style={{
-                    fontFamily:BODY,fontSize:14,color:INK,background:'#fff',
-                    border:`1px solid ${RULE}`,padding:'5px 8px',outline:'none'}}>
-                    <option value="reciente">Más reciente</option>
-                    <option value="antiguo">Más antiguo</option>
+                    fontFamily:BODY,fontSize:13,color:INK,background:'#fff',
+                    border:`1px solid ${RULE}`,padding:'4px 6px',outline:'none'}}>
+                    <option value="reciente">Más reciente primero</option>
+                    <option value="antiguo">Más antiguo primero</option>
                     <option value="titulo">Título A–Z</option>
                     <option value="autor">Autor A–Z</option>
                   </select>
+                  {(q||fDomain||fPeriod||fTag) && (
+                    <button onClick={()=>{setQ('');setFDomain('');setFPeriod('');setFTag('');}} style={{
+                      fontFamily:MONO,fontSize:10,color:ACCENT,background:'none',
+                      border:`1px solid ${ACCENT}`,padding:'3px 8px',
+                      cursor:'pointer',marginLeft:4,letterSpacing:0.5}}>✕ Limpiar</button>
+                  )}
                   <span style={{fontFamily:MONO,fontSize:11,color:'#888',marginLeft:'auto'}}>
-                    {filtered.length.toLocaleString('es')} resultado{filtered.length!==1?'s':''}
+                    {algoliaLoading
+                      ? 'Buscando…'
+                      : usingAlgolia
+                        ? `${algoliaResults.length} resultado${algoliaResults.length!==1?'s':''} (texto completo)`
+                        : `${filtered.length.toLocaleString('es')} resultado${filtered.length!==1?'s':''}`
+                    }
                   </span>
                 </div>
+                {/* Algolia mode indicator */}
+                {usingAlgolia && !algoliaLoading && (
+                  <div style={{marginTop:6,fontFamily:MONO,fontSize:10,color:'#aaa',letterSpacing:0.5}}>
+                    ⚡ Búsqueda en texto completo · {algoliaResults.length} artículos encontrados
+                  </div>
+                )}
+                {/* Active tag filter pill */}
+                {fTag && (
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
+                    <span style={{fontFamily:MONO,fontSize:11,color:'#888'}}>Etiqueta:</span>
+                    <span style={{fontFamily:MONO,fontSize:12,color:INK,
+                                  background:'#fff',border:`1px solid ${INK}`,
+                                  padding:'2px 10px',display:'flex',alignItems:'center',gap:6}}>
+                      {fTag}
+                      <button onClick={()=>setFTag('')} style={{background:'none',border:'none',
+                        cursor:'pointer',color:'#aaa',fontSize:14,lineHeight:1,padding:0}}>×</button>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {articles.length===0 && (
@@ -305,9 +390,15 @@ export default function App() {
                           <td style={{padding:'10px 10px',fontFamily:MONO,fontSize:12,color:'#444',verticalAlign:'top'}}>{a.year}</td>
                           <td style={{padding:'10px 10px',fontFamily:MONO,fontSize:12,verticalAlign:'top'}}>{a.no}</td>
                           <td style={{padding:'10px 10px',verticalAlign:'top',lineHeight:1.4}}>
-                            <div style={{fontFamily:BODY,fontSize:15,color:INK,marginBottom:6}}>
+                            <div style={{fontFamily:BODY,fontSize:15,color:INK,marginBottom:4}}>
                               {hl(a.title,q)}
                             </div>
+                            {a.resumen && (
+                              <div style={{fontFamily:BODY,fontSize:12,color:'#666',
+                                           lineHeight:1.5,marginBottom:5,fontStyle:'italic'}}>
+                                {hl(a.resumen,q)}
+                              </div>
+                            )}
                             <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                               {a.tags.map(tag=>(
                                 <button key={tag} onClick={()=>{setFTag(tag);setPage(1);}}
@@ -337,13 +428,18 @@ export default function App() {
                             <div>{a.period}</div>
                             {a.domain && <div style={{color:'#aaa',marginTop:2,fontSize:10}}>{a.domain}</div>}
                           </td>
-                          <td style={{padding:'10px 10px',verticalAlign:'top'}}>
-                            <a href={a.pdf_url} target="_blank" rel="noreferrer"
-                              style={{fontFamily:MONO,fontSize:11,color:ACCENT,
-                                      textDecoration:'none',border:`1px solid ${ACCENT}`,
-                                      padding:'2px 6px',whiteSpace:'nowrap'}}>
-                              PDF
-                            </a>
+                          <td style={{padding:"10px 10px",verticalAlign:"top"}}>
+                            {a.pdf_url ? (
+                              <a href={a.pdf_url} target="_blank" rel="noreferrer"
+                                style={{fontFamily:MONO,fontSize:11,color:ACCENT,
+                                        textDecoration:"none",border:`1px solid ${ACCENT}`,
+                                        padding:"3px 7px",whiteSpace:"nowrap",display:"inline-block"}}>
+                                PDF ↗
+                              </a>
+                            ) : (
+                              <span style={{fontFamily:MONO,fontSize:11,color:"#ccc",
+                                            border:"1px solid #ddd",padding:"3px 7px"}}>PDF</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -353,11 +449,11 @@ export default function App() {
                   {totalPages>1 && (
                     <div style={{display:'flex',alignItems:'center',justifyContent:'center',
                                  gap:20,padding:'24px 0',borderTop:`1px solid ${RULE}`}}>
-                      <PagerBtn disabled={page<=1} onClick={()=>setPage(p=>p-1)}>← Anterior</PagerBtn>
+                      <PagerBtn disabled={currentPage<=1} onClick={()=>usingAlgolia?setAlgoliaPage(p=>p-1):setPage(p=>p-1)}>← Anterior</PagerBtn>
                       <span style={{fontFamily:MONO,fontSize:12,color:'#888'}}>
-                        Página {page} de {totalPages}
+                        Página {currentPage} de {totalPages}
                       </span>
-                      <PagerBtn disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Siguiente →</PagerBtn>
+                      <PagerBtn disabled={currentPage>=totalPages} onClick={()=>usingAlgolia?setAlgoliaPage(p=>p+1):setPage(p=>p+1)}>Siguiente →</PagerBtn>
                     </div>
                   )}
                 </>
@@ -376,7 +472,7 @@ export default function App() {
               Los números en <span style={{color:'#1a5c1a',fontWeight:600}}>verde</span> están en el índice.
             </p>
             {decades.map(dec=>{
-              const decIssues=ISSUES.filter(i=>{const y=parseInt(i.year);return y>=dec&&y<dec+10;});
+              const decIssues=ISSUES.filter(i=>{const y=parseInt(i.year);return y>=dec&&y<dec+10;}).sort((a,b)=>parseInt(b.year)-parseInt(a.year)||(parseInt(b.no)||0)-(parseInt(a.no)||0));
               if(!decIssues.length) return null;
               return (
                 <div key={dec} style={{marginBottom:28}}>
@@ -628,11 +724,12 @@ function SideSection({label,children}) {
 function SideBtn({active,onClick,children}) {
   return (
     <button onClick={onClick} style={{
-      fontFamily:BODY,fontSize:13,color:active?INK:'#555',
+      fontFamily:BODY,fontSize:12,color:active?INK:'#555',
       background:active?'#fff':'transparent',border:'none',
-      textAlign:'left',padding:'5px 6px',cursor:'pointer',
+      textAlign:'left',padding:'4px 6px',cursor:'pointer',
       borderRadius:2,lineHeight:1.4,fontWeight:active?600:400,
-      boxShadow:active?`inset 2px 0 0 ${ACCENT}`:'none'}}>
+      boxShadow:active?`inset 2px 0 0 ${ACCENT}`:'none',
+      display:'flex',alignItems:'center',width:'100%'}}>
       {children}
     </button>
   );

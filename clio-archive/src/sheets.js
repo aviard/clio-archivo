@@ -4,7 +4,7 @@
 
 const SHEET_ID = import.meta.env.VITE_SHEETS_ID;
 const API_KEY  = import.meta.env.VITE_SHEETS_API_KEY;
-const RANGE    = 'Artículos!A2:J';
+const RANGE    = 'Artículos!A2:L';
 
 export async function loadAllArticles() {
   if (!SHEET_ID || !API_KEY) return [];
@@ -23,6 +23,8 @@ export async function loadAllArticles() {
     tags:     r[7] ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],
     new_tags: r[8] ? r[8].split(',').map(t => t.trim()).filter(Boolean) : [],
     pdf_url:  r[9] || '',
+    indice:   r[10] || '',
+    resumen:  r[11] || '',
   }));
 }
 
@@ -43,6 +45,8 @@ export async function appendIssueArticles(issue, articles) {
     (a.tags    || []).join(', '),
     (a.new_tags|| []).join(', '),
     issue.pdf,
+    a.indice   || '',
+    a.resumen  || '',
   ]);
   const resp = await fetch('/api/append', {
     method: 'POST',
