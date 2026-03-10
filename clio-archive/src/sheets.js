@@ -1,5 +1,5 @@
 // Google Sheets integration
-// Columns: A=año B=número C=título D=autor E=páginas F=tema G=dominio H=período I=etiquetas J=etiquetas_nuevas K=pdf_url L=indice M=resumen
+// Columns: A=año B=número C=título D=autor_original E=autor_normalizado F=dominio G=período H=etiquetas I=(empty) J=pdf_url K=indice L=resumen
 
 const SHEET_ID = import.meta.env.VITE_SHEETS_ID;
 const API_KEY  = import.meta.env.VITE_SHEETS_API_KEY;
@@ -15,13 +15,13 @@ export async function loadAllArticles() {
     year:     r[0]  || '',
     no:       r[1]  || '',
     title:    r[2]  || '',
-    author:   r[3]  || '',
-    pages:    r[4]  || '',
-    domain:   r[5]  || '',   // F = Tema = dominio value
-    period:   r[6]  || '',   // G = Dominio = periodo value
-    tags:     r[7]  ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],  // H = Periodo = etiquetas
+    author:   r[4]  || r[3] || '',  // E = autor normalizado, fallback to D
+    pages:    '',
+    domain:   r[5]  || '',          // F = dominio
+    period:   r[6]  || '',          // G = período
+    tags:     r[7]  ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],  // H = etiquetas
     new_tags: [],
-    pdf_url:  r[9]  || '',   // J = Etiquetas Nuevas = pdf_url
+    pdf_url:  r[9]  || '',          // J = pdf_url
     indice:   r[10] || '',
     resumen:  r[11] || '',
   }));
