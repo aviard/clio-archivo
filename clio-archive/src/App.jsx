@@ -495,7 +495,7 @@ export default function App() {
                   </div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                     {decIssues.map(iss=>{
-                      const done=cataloged.has(`${iss.year}-${iss.no}`);
+                      const done=cataloged.has(`${iss.year}-${iss.no}`) || cataloged.has(iss.no);
                       const count=done?articles.filter(a=>a.year===iss.year&&a.no===iss.no).length:null;
                       return (
                         <a key={`${iss.year}-${iss.no}`} href={iss.pdf}
@@ -677,7 +677,7 @@ export default function App() {
             <AdminCard label="ESTADO POR NÚMERO">
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(64px,1fr))',gap:4}}>
                 {ISSUES.map(iss=>{
-                  const done=cataloged.has(`${iss.year}-${iss.no}`);
+                  const done=cataloged.has(`${iss.year}-${iss.no}`) || cataloged.has(iss.no);
                   return (
                     <div key={`${iss.year}-${iss.no}`} style={{
                       padding:'5px 4px',textAlign:'center',border:'1px solid',

@@ -30,13 +30,17 @@ export async function loadAllArticles() {
 
 export async function loadCatalogedKeys() {
   const arts = await loadAllArticles();
-  // Store both "year-no" and just "no" so Por Número matches regardless of issues.js format
-  // Use a separate set per format to avoid inflating the count
-  const byYearNo = new Set(arts.map(a => `${a.year}-${a.no}`));
-  const byNo     = new Set(arts.map(a => a.no));
-  // Return combined but track unique issues only by year-no
-  byNo.forEach(n => byYearNo.add(n));
-  return { has: k => byYearNo.has(k), size: new Set(arts.map(a => `${a.year}-${a.no}`)).size };
+  // Build lookup with multiple key formats to handle mismatches between issues.js and sheet
+  // e.g. issues.js year="1992-1993", no="149-150" but sheet stores year="1992"
+  const keys = new Set();
+  arts.forEach(a => {
+    const y4 = a.year.slice(0, 4);     // normalize "1992-1993" → "1992"
+    keys.add(`${a.year}-${a.no}`);     // as stored in sheet: "1992-149-150"
+    keys.add(`${y4}-${a.no}`);         // normalized: "1992-149-150"
+    keys.add(a.no);                     // bare number: "149-150"
+  });
+  const size = new Set(arts.map(a => `${a.year}-${a.no}`)).size;
+  return { has: k => keys.has(k), size };
 }
 
 export async function appendIssueArticles(issue, articles) {
