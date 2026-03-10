@@ -13,6 +13,16 @@ const MONO   = "'JetBrains Mono','Courier New',monospace";
 const SERIF  = "'Libre Baskerville',Georgia,serif";
 const BODY   = "'Source Serif 4',Georgia,serif";
 
+function useWindowWidth() {
+  const [w, setW] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  useEffect(() => {
+    const handle = () => setW(window.innerWidth);
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+  return w;
+}
+
 function hl(text, q) {
   if (!q || !text) return text;
   const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -24,6 +34,7 @@ function hl(text, q) {
 }
 
 export default function App() {
+  const isMobile = useWindowWidth() < 768;
   const [view, setView]           = useState('search');
   const [articles, setArticles]   = useState([]);
   const [cataloged, setCataloged] = useState(new Set());
@@ -202,53 +213,63 @@ export default function App() {
   );
 
   return (
-    <div style={{minHeight:'100vh',background:OFFWHT,color:INK,fontFamily:BODY}}>
+    <div style={{minHeight:'100vh',background:OFFWHT,color:INK,fontFamily:BODY,overflowX:'hidden'}}>
 
       {/* Header */}
       <header style={{background:'#fff',borderBottom:`3px solid ${INK}`}}>
-        <div style={{maxWidth:1280,margin:'0 auto',padding:'28px 32px 0'}}>
+        <div style={{maxWidth:1280,margin:'0 auto',padding:isMobile?'16px 16px 0':'28px 32px 0'}}>
           <div style={{display:'flex',justifyContent:'space-between',
-                       alignItems:'flex-start',flexWrap:'wrap',gap:16,marginBottom:20}}>
+                       alignItems:'flex-start',flexWrap:'wrap',gap:12,marginBottom:isMobile?12:20}}>
             <div>
               <div style={{fontFamily:MONO,fontSize:10,letterSpacing:3,
                            color:'#888',textTransform:'uppercase',marginBottom:6}}>
                 Academia Dominicana de la Historia
               </div>
-              <h1 style={{fontFamily:SERIF,fontSize:48,fontWeight:700,
+              <h1 style={{fontFamily:SERIF,fontSize:isMobile?32:48,fontWeight:700,
                           color:INK,margin:'0 0 4px',letterSpacing:-1,lineHeight:1}}>
                 <em>Clío</em>
               </h1>
-              <div style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                Índice Analítico · Números 1–209 · 1933–2025
+              <div style={{fontFamily:MONO,fontSize:10,color:'#888',letterSpacing:1}}>
+                Índice Analítico · Números 1–210 · 1933–2025
               </div>
             </div>
-            <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
-              <Stat n={articles.length.toLocaleString('es')} label="artículos indexados"/>
-              <Stat n={`${cataloged.size}/${ISSUES.length}`} label="números catalogados"/>
-              <Stat n={allTags.length.toLocaleString('es')} label="etiquetas temáticas"/>
-            </div>
+            {!isMobile && (
+              <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
+                <Stat n={articles.length.toLocaleString('es')} label="artículos indexados"/>
+                <Stat n={`${cataloged.size}/${ISSUES.length}`} label="números catalogados"/>
+                <Stat n={allTags.length.toLocaleString('es')} label="etiquetas temáticas"/>
+              </div>
+            )}
           </div>
+          {isMobile && (
+            <div style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap'}}>
+              <Stat n={articles.length.toLocaleString('es')} label="artículos"/>
+              <Stat n={`${cataloged.size}/${ISSUES.length}`} label="números"/>
+              <Stat n={allTags.length.toLocaleString('es')} label="etiquetas"/>
+            </div>
+          )}
           <div style={{borderTop:`1px solid ${RULE}`}}/>
-          <nav style={{display:'flex'}}>
-            {[['search','Búsqueda'],['browse','Por Número'],['tags','Índice de Etiquetas'],['admin','Administración']].map(([id,label])=>(
+          <nav style={{display:'flex',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+            {[['search','Búsqueda'],['browse','Por Número'],['tags','Etiquetas'],['admin','Admin']].map(([id,label])=>(
               <button key={id} onClick={()=>setView(id)} style={{
-                fontFamily:MONO,fontSize:11,letterSpacing:2,textTransform:'uppercase',
-                padding:'12px 20px',background:'transparent',border:'none',cursor:'pointer',
+                fontFamily:MONO,fontSize:isMobile?10:11,letterSpacing:isMobile?1:2,textTransform:'uppercase',
+                padding:isMobile?'10px 12px':'12px 20px',background:'transparent',border:'none',cursor:'pointer',
                 borderBottom:view===id?`3px solid ${ACCENT}`:'3px solid transparent',
-                color:view===id?INK:'#666',
+                color:view===id?INK:'#666',whiteSpace:'nowrap',
               }}>{label}</button>
             ))}
           </nav>
         </div>
       </header>
 
-      <div style={{maxWidth:1280,margin:'0 auto',padding:'32px 32px 80px'}}>
+      <div style={{maxWidth:1280,margin:'0 auto',padding:isMobile?'16px 12px 60px':'32px 32px 80px'}}>
 
         {/* ══ BÚSQUEDA ══════════════════════════════════════════════════════ */}
         {view==='search' && (
           <div style={{display:'flex',gap:36,alignItems:'flex-start'}}>
 
-            {/* Sidebar — top tags */}
+            {/* Sidebar — hidden on mobile */}
+            {!isMobile && (
             <aside style={{width:200,flexShrink:0,position:'sticky',top:20}}>
               <SideSection label="ETIQUETAS FRECUENTES">
                 {allTags
@@ -264,6 +285,7 @@ export default function App() {
                 }
               </SideSection>
             </aside>
+            )}  {/* end !isMobile sidebar */}
 
             {/* Results */}
             <div style={{flex:1,minWidth:0}}>
@@ -286,29 +308,31 @@ export default function App() {
                 {/* Filter + sort bar */}
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',
                              background:'#fff',border:`1px solid ${RULE}`,padding:'8px 12px'}}>
-                  <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
-                                color:'#aaa',textTransform:'uppercase',marginRight:4}}>Filtrar:</span>
+                  {!isMobile && <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
+                                color:'#aaa',textTransform:'uppercase',marginRight:4}}>Filtrar:</span>}
                   <select value={fDomain} onChange={e=>setFDomain(e.target.value)} style={{
                     fontFamily:BODY,fontSize:13,color:fDomain?INK:'#888',background:'#fff',
                     border:`1px solid ${fDomain?INK:RULE}`,padding:'4px 6px',outline:'none',
-                    maxWidth:190}}>
+                    flex:isMobile?'1 1 45%':undefined,maxWidth:isMobile?undefined:190}}>
                     <option value="">Todos los dominios</option>
                     {DOMAINS.map(d=><option key={d} value={d}>{d}</option>)}
                   </select>
                   <select value={fPeriod} onChange={e=>setFPeriod(e.target.value)} style={{
                     fontFamily:BODY,fontSize:13,color:fPeriod?INK:'#888',background:'#fff',
-                    border:`1px solid ${fPeriod?INK:RULE}`,padding:'4px 6px',outline:'none'}}>
+                    border:`1px solid ${fPeriod?INK:RULE}`,padding:'4px 6px',outline:'none',
+                    flex:isMobile?'1 1 45%':undefined}}>
                     <option value="">Todos los períodos</option>
                     {PERIODS.map(p=><option key={p} value={p}>{p}</option>)}
                   </select>
-                  <div style={{width:1,height:20,background:RULE,margin:'0 4px'}}/>
-                  <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
-                                color:'#aaa',textTransform:'uppercase'}}>Ordenar:</span>
+                  {!isMobile && <div style={{width:1,height:20,background:RULE,margin:'0 4px'}}/>}
+                  {!isMobile && <span style={{fontFamily:MONO,fontSize:10,letterSpacing:1.5,
+                                color:'#aaa',textTransform:'uppercase'}}>Ordenar:</span>}
                   <select value={sortBy} onChange={e=>setSort(e.target.value)} style={{
                     fontFamily:BODY,fontSize:13,color:INK,background:'#fff',
-                    border:`1px solid ${RULE}`,padding:'4px 6px',outline:'none'}}>
-                    <option value="reciente">Más reciente primero</option>
-                    <option value="antiguo">Más antiguo primero</option>
+                    border:`1px solid ${RULE}`,padding:'4px 6px',outline:'none',
+                    flex:isMobile?'1 1 45%':undefined}}>
+                    <option value="reciente">Más reciente</option>
+                    <option value="antiguo">Más antiguo</option>
                     <option value="titulo">Título A–Z</option>
                     <option value="autor">Autor A–Z</option>
                   </select>
@@ -316,14 +340,14 @@ export default function App() {
                     <button onClick={()=>{setQ('');setFDomain('');setFPeriod('');setFTag('');setFAuthor('');}} style={{
                       fontFamily:MONO,fontSize:10,color:ACCENT,background:'none',
                       border:`1px solid ${ACCENT}`,padding:'3px 8px',
-                      cursor:'pointer',marginLeft:4,letterSpacing:0.5}}>✕ Limpiar</button>
+                      cursor:'pointer',letterSpacing:0.5}}>✕ Limpiar</button>
                   )}
-                  <span style={{fontFamily:MONO,fontSize:11,color:'#888',marginLeft:'auto'}}>
+                  <span style={{fontFamily:MONO,fontSize:11,color:'#888',marginLeft:'auto',whiteSpace:'nowrap'}}>
                     {algoliaLoading
                       ? 'Buscando…'
                       : usingAlgolia
-                        ? `${algoliaResults.length} resultado${algoliaResults.length!==1?'s':''} (texto completo)`
-                        : `${filtered.length.toLocaleString('es')} resultado${filtered.length!==1?'s':''}`
+                        ? `${algoliaResults.length} resultados`
+                        : `${filtered.length.toLocaleString('es')} resultados`
                     }
                   </span>
                 </div>
@@ -392,6 +416,82 @@ export default function App() {
 
               {pageArts.length>0 && (
                 <>
+                  {isMobile ? (
+                    /* Mobile: card layout */
+                    <div style={{display:'flex',flexDirection:'column',gap:0}}>
+                      {pageArts.map((a,i)=>(
+                        <div key={i} style={{background:'#fff',borderBottom:`1px solid #ede8e0`,
+                                             padding:'14px 12px'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',
+                                       alignItems:'flex-start',marginBottom:4,gap:8}}>
+                            <div style={{fontFamily:MONO,fontSize:11,color:'#888'}}>
+                              Núm. {a.no} · {a.year}
+                            </div>
+                            {a.pdf_url && (
+                              <a href={a.pdf_url} target="_blank" rel="noreferrer"
+                                style={{fontFamily:MONO,fontSize:11,color:ACCENT,
+                                        textDecoration:'none',border:`1px solid ${ACCENT}`,
+                                        padding:'2px 6px',whiteSpace:'nowrap',flexShrink:0}}>
+                                PDF ↗
+                              </a>
+                            )}
+                          </div>
+                          <div style={{fontFamily:BODY,fontSize:15,color:INK,
+                                       marginBottom:4,lineHeight:1.4}}>
+                            {a.pdf_url
+                              ? <a href={a.pdf_url} target="_blank" rel="noreferrer"
+                                  style={{color:INK,textDecoration:'none',borderBottom:`1px solid ${RULE}`}}
+                                  dangerouslySetInnerHTML={a._isAlgolia?{__html:a.title}:undefined}>
+                                  {a._isAlgolia?undefined:hl(a.title,q)}
+                                </a>
+                              : a._isAlgolia
+                                ? <span dangerouslySetInnerHTML={{__html:a.title}}/>
+                                : hl(a.title,q)
+                            }
+                          </div>
+                          <div style={{fontFamily:BODY,fontSize:13,color:'#555',
+                                       fontStyle:'italic',marginBottom:6}}>
+                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setFAuthor(a._isAlgolia?a.author.replace(/<[^>]*>/g,''):a.author);}}
+                              style={{fontFamily:'inherit',fontStyle:'italic',fontSize:13,
+                                      color:'#555',background:'none',border:'none',
+                                      cursor:'pointer',padding:0,textDecoration:'underline dotted'}}
+                              dangerouslySetInnerHTML={a._isAlgolia?{__html:a.author}:undefined}>
+                              {a._isAlgolia?undefined:hl(a.author,q)}
+                            </button>
+                          </div>
+                          {a.resumen && (
+                            <div style={{fontFamily:BODY,fontSize:12,color:'#666',
+                                         lineHeight:1.5,marginBottom:6,fontStyle:'italic'}}>
+                              {a._isAlgolia
+                                ? <span dangerouslySetInnerHTML={{__html:a.resumen}}/>
+                                : hl(a.resumen,q)
+                              }
+                            </div>
+                          )}
+                          <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:4}}>
+                            {(Array.isArray(a.tags)
+                              ? a.tags.flatMap(t=>typeof t==='string'&&t.includes(',')?t.split(',').map(s=>s.trim()):[t])
+                              : []
+                            ).filter(Boolean).map(tag=>(
+                              <button key={tag} onClick={()=>{setFTag(tag);setPage(1);}}
+                                style={{fontFamily:MONO,fontSize:10,color:'#555',
+                                        background:fTag===tag?'#ede8e0':'#f5f2ee',
+                                        border:`1px solid ${RULE}`,padding:'2px 7px',
+                                        cursor:'pointer',borderRadius:2}}>
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                          {(a.period||a.domain) && (
+                            <div style={{fontFamily:MONO,fontSize:10,color:'#aaa',marginTop:2}}>
+                              {a.period}{a.period&&a.domain?' · ':''}{a.domain}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                  /* Desktop: table layout */
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:14,background:'#fff'}}>
                     <thead>
                       <tr>
@@ -487,6 +587,7 @@ export default function App() {
                       ))}
                     </tbody>
                   </table>
+                  )} {/* end desktop table */}
 
                   {totalPages>1 && (
                     <div style={{display:'flex',alignItems:'center',justifyContent:'center',
@@ -508,8 +609,8 @@ export default function App() {
         {view==='browse' && (
           <div style={{maxWidth:1060}}>
             <PageHeading>Números de <em>Clío</em></PageHeading>
-            <p style={{fontFamily:BODY,fontSize:16,color:'#444',lineHeight:1.7,
-                       margin:'0 0 28px',maxWidth:720}}>
+            <p style={{fontFamily:BODY,fontSize:isMobile?14:16,color:'#444',lineHeight:1.7,
+                       margin:'0 0 20px'}}>
               {ISSUES.length} números publicados entre 1933 y 2025.
               Los números en <span style={{color:'#1a5c1a',fontWeight:600}}>verde</span> están en el índice.
             </p>
@@ -517,31 +618,32 @@ export default function App() {
               const decIssues=ISSUES.filter(i=>{const y=parseInt(i.year);return y>=dec&&y<dec+10;}).sort((a,b)=>parseInt(b.year)-parseInt(a.year)||(parseInt(b.no)||0)-(parseInt(a.no)||0));
               if(!decIssues.length) return null;
               return (
-                <div key={dec} style={{marginBottom:28}}>
+                <div key={dec} style={{marginBottom:20}}>
                   <div style={{fontFamily:MONO,fontSize:11,letterSpacing:3,color:'#888',
                                textTransform:'uppercase',marginBottom:8,
                                borderBottom:`1px solid ${RULE}`,paddingBottom:4}}>
                     {dec}–{dec+9}
                   </div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:isMobile?4:6}}>
                     {decIssues.map(iss=>{
                       const done=cataloged.has(`${iss.year}-${iss.no}`) || cataloged.has(iss.no);
                       const count=done?articles.filter(a=>a.year===iss.year&&a.no===iss.no).length:null;
                       return (
                         <a key={`${iss.year}-${iss.no}`} href={iss.pdf}
                           target="_blank" rel="noreferrer" className="issue-cell"
-                          style={{padding:'8px 10px',
+                          style={{padding:isMobile?'6px 6px':'8px 10px',
                             background:done?'#f0f7f0':'#fff',
                             border:`1px solid ${done?'#5a9a5a':RULE}`,
                             textDecoration:'none',display:'flex',
-                            flexDirection:'column',alignItems:'center',minWidth:80}}>
-                          <span style={{fontFamily:SERIF,fontSize:13,fontWeight:700,color:INK}}>
+                            flexDirection:'column',alignItems:'center',
+                            minWidth:isMobile?60:80}}>
+                          <span style={{fontFamily:SERIF,fontSize:isMobile?11:13,fontWeight:700,color:INK}}>
                             Núm. {iss.no}
                           </span>
-                          <span style={{fontFamily:MONO,fontSize:10,color:'#888',marginTop:1}}>
+                          <span style={{fontFamily:MONO,fontSize:9,color:'#888',marginTop:1}}>
                             {iss.year}
                           </span>
-                          {count!==null&&(
+                          {count!==null&&!isMobile&&(
                             <span style={{fontFamily:MONO,fontSize:10,color:'#2a7a2a',marginTop:2}}>
                               {count} arts.
                             </span>
@@ -558,10 +660,10 @@ export default function App() {
 
         {/* ══ ÍNDICE DE ETIQUETAS ═══════════════════════════════════════════ */}
         {view==='tags' && (
-          <div style={{maxWidth:1060}}>
+          <div>
             <PageHeading>Índice de Etiquetas</PageHeading>
-            <p style={{fontFamily:BODY,fontSize:16,color:'#444',lineHeight:1.7,
-                       margin:'0 0 28px',maxWidth:720}}>
+            <p style={{fontFamily:BODY,fontSize:isMobile?14:16,color:'#444',lineHeight:1.7,
+                       margin:'0 0 20px'}}>
               {allTags.length} etiquetas temáticas en uso. Haga clic en cualquiera
               para ver todos los artículos que la llevan.
             </p>
@@ -630,10 +732,10 @@ export default function App() {
 
         {/* ══ ADMINISTRACIÓN ════════════════════════════════════════════════ */}
         {view==='admin' && (
-          <div style={{maxWidth:740}}>
+          <div>
             <PageHeading>Administración del Índice</PageHeading>
-            <p style={{fontFamily:BODY,fontSize:16,color:'#444',lineHeight:1.7,
-                       margin:'0 0 28px',maxWidth:620}}>
+            <p style={{fontFamily:BODY,fontSize:isMobile?14:16,color:'#444',lineHeight:1.7,
+                       margin:'0 0 20px'}}>
               El sistema lee cada PDF, extrae artículos y asigna dominio, período histórico
               y etiquetas temáticas. Los datos se guardan en Google Sheets.
             </p>
@@ -653,7 +755,7 @@ export default function App() {
             {!running ? (
               <AdminCard label="INICIAR CATALOGACIÓN">
                 <p style={{fontFamily:BODY,fontSize:15,color:'#555',lineHeight:1.7,
-                           margin:'0 0 16px',maxWidth:560}}>
+                           margin:'0 0 16px'}}>
                   Seleccione cuántos números procesar en esta sesión.
                   El sistema omite los ya catalogados y puede detenerse y continuar en cualquier momento.
                 </p>
@@ -726,8 +828,8 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer style={{background:INK,color:'#aaa',padding:'16px 32px',marginTop:40}}>
-        <div style={{maxWidth:1280,margin:'0 auto',fontFamily:MONO,fontSize:11,
+      <footer style={{background:INK,color:'#aaa',padding:isMobile?'14px 16px':'16px 32px',marginTop:40}}>
+        <div style={{maxWidth:1280,margin:'0 auto',fontFamily:MONO,fontSize:isMobile?10:11,
                      letterSpacing:0.5,display:'flex',flexWrap:'wrap',alignItems:'center',gap:4}}>
           <span>Índice analítico de <em>Clío</em> — Academia Dominicana de la Historia</span>
           <span style={{margin:'0 12px',color:'#555'}}>·</span>
@@ -806,7 +908,7 @@ function EmptyState({children}) {
 }
 function AdminCard({label,children}) {
   return (
-    <div style={{background:'#fff',border:`1px solid ${RULE}`,padding:'20px 24px',marginBottom:20}}>
+    <div style={{background:'#fff',border:`1px solid ${RULE}`,padding:'16px',marginBottom:16}}>
       <div style={{fontFamily:MONO,fontSize:10,letterSpacing:2,color:'#888',
                    textTransform:'uppercase',marginBottom:12,
                    borderBottom:`1px solid ${RULE}`,paddingBottom:8}}>{label}</div>
