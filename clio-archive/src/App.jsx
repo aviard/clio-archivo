@@ -35,6 +35,7 @@ export default function App() {
   const [fDomain, setFDomain] = useState('');
   const [fPeriod, setFPeriod] = useState('');
   const [fTag, setFTag]     = useState('');
+  const [fAuthor, setFAuthor] = useState('');
   const [sortBy, setSort]   = useState('reciente');
   const [page, setPage]     = useState(1);
   const PER_PAGE = 50;
@@ -63,7 +64,7 @@ export default function App() {
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
-  useEffect(() => { setPage(1); }, [q, fDomain, fPeriod, fTag, sortBy]);
+  useEffect(() => { setPage(1); }, [q, fDomain, fPeriod, fTag, fAuthor, sortBy]);
 
   // Algolia: trigger search when query is 2+ chars, debounced 300ms
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function App() {
               !(a.indice ||''  ).toLowerCase().includes(lq)) return false;
     if (fDomain && a.domain !== fDomain) return false;
     if (fPeriod && a.period !== fPeriod) return false;
+    if (fAuthor && a.author !== fAuthor) return false;
     if (fTag && !a.tags.includes(fTag) && !a.new_tags.includes(fTag)) return false;
     return true;
   }).sort((a,b) => {
@@ -217,7 +219,7 @@ export default function App() {
                 <em>Clío</em>
               </h1>
               <div style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                Índice Analítico · Números 1–210 · 1933–2025
+                Índice Analítico · Números 1–209 · 1933–2025
               </div>
             </div>
             <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
@@ -310,8 +312,8 @@ export default function App() {
                     <option value="titulo">Título A–Z</option>
                     <option value="autor">Autor A–Z</option>
                   </select>
-                  {(q||fDomain||fPeriod||fTag) && (
-                    <button onClick={()=>{setQ('');setFDomain('');setFPeriod('');setFTag('');}} style={{
+                  {(q||fDomain||fPeriod||fTag||fAuthor) && (
+                    <button onClick={()=>{setQ('');setFDomain('');setFPeriod('');setFTag('');setFAuthor('');}} style={{
                       fontFamily:MONO,fontSize:10,color:ACCENT,background:'none',
                       border:`1px solid ${ACCENT}`,padding:'3px 8px',
                       cursor:'pointer',marginLeft:4,letterSpacing:0.5}}>✕ Limpiar</button>
@@ -340,6 +342,19 @@ export default function App() {
                                   padding:'2px 10px',display:'flex',alignItems:'center',gap:6}}>
                       {fTag}
                       <button onClick={()=>setFTag('')} style={{background:'none',border:'none',
+                        cursor:'pointer',color:'#aaa',fontSize:14,lineHeight:1,padding:0}}>×</button>
+                    </span>
+                  </div>
+                )}
+                {/* Active author filter pill */}
+                {fAuthor && (
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
+                    <span style={{fontFamily:MONO,fontSize:11,color:'#888'}}>Autor:</span>
+                    <span style={{fontFamily:MONO,fontSize:12,color:INK,
+                                  background:'#fff',border:`1px solid ${INK}`,
+                                  padding:'2px 10px',display:'flex',alignItems:'center',gap:6}}>
+                      {fAuthor}
+                      <button onClick={()=>setFAuthor('')} style={{background:'none',border:'none',
                         cursor:'pointer',color:'#aaa',fontSize:14,lineHeight:1,padding:0}}>×</button>
                     </span>
                   </div>
@@ -441,7 +456,7 @@ export default function App() {
                           </td>
                           <td style={{padding:'10px 10px',fontStyle:'italic',color:'#444',
                                       fontSize:13,verticalAlign:'top'}}>
-                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setQ(a._isAlgolia ? a.author.replace(/<[^>]*>/g,'') : a.author);}}
+                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setFAuthor(a._isAlgolia ? a.author.replace(/<[^>]*>/g,'') : a.author);}}
                               style={{fontFamily:'inherit',fontStyle:'italic',fontSize:13,
                                       color:'#444',background:'none',border:'none',
                                       cursor:'pointer',padding:0,textAlign:'left',
