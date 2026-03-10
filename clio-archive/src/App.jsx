@@ -212,7 +212,7 @@ export default function App() {
                 <em>Clío</em>
               </h1>
               <div style={{fontFamily:MONO,fontSize:11,color:'#888',letterSpacing:1}}>
-                Índice Analítico · Números 1–210 · 1933–2025
+                Índice Analítico · Números 1–209 · 1933–2025
               </div>
             </div>
             <div style={{display:'flex',gap:28,flexWrap:'wrap'}}>
@@ -421,7 +421,13 @@ export default function App() {
                           </td>
                           <td style={{padding:'10px 10px',fontStyle:'italic',color:'#444',
                                       fontSize:13,verticalAlign:'top'}}>
-                            {hl(a.author,q)}
+                            <button onClick={()=>{setQ('');setFTag('');setFDomain('');setFPeriod('');setQ(a.author);}}
+                              style={{fontFamily:'inherit',fontStyle:'italic',fontSize:13,
+                                      color:'#444',background:'none',border:'none',
+                                      cursor:'pointer',padding:0,textAlign:'left',
+                                      textDecoration:'underline dotted',textUnderlineOffset:3}}>
+                              {hl(a.author,q)}
+                            </button>
                           </td>
                           <td style={{padding:'10px 10px',fontFamily:MONO,fontSize:11,
                                       color:'#666',verticalAlign:'top',lineHeight:1.4}}>

@@ -20,8 +20,8 @@ export async function loadAllArticles() {
     pages:    r[4] || '',
     domain:   r[5] || '',
     period:   r[6] || '',
-    tags:     r[7] ? r[7].split(',').map(t => t.trim()).filter(Boolean) : [],
-    new_tags: r[8] ? r[8].split(',').map(t => t.trim()).filter(Boolean) : [],
+    tags:     r[7] ? r[7].split('|').map(t => t.trim()).filter(Boolean) : [],
+    new_tags: r[8] ? r[8].split('|').map(t => t.trim()).filter(Boolean) : [],
     pdf_url:  r[9] || '',
     indice:   r[10] || '',
     resumen:  r[11] || '',
@@ -30,7 +30,12 @@ export async function loadAllArticles() {
 
 export async function loadCatalogedKeys() {
   const arts = await loadAllArticles();
-  return new Set(arts.map(a => `${a.year}-${a.no}`));
+  const keys = new Set();
+  arts.forEach(a => {
+    keys.add(`${a.year}-${a.no}`);  // e.g. "1946-74-75"
+    keys.add(a.no);                  // e.g. "74-75" — fallback for issues.js mismatches
+  });
+  return keys;
 }
 
 export async function appendIssueArticles(issue, articles) {
